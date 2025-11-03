@@ -11,13 +11,17 @@ from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Cipher import Blowfish
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
 # DB Connect
 
+CONNECTION_STRING = os.getenv("MONGO_URI")
+SECRET_KEY = os.getenv("SECRET_KEY")
 @st.cache_resource
 def init_connection():
     try:
-        CONNECTION_STRING = "mongodb://localhost:27017/"
+
         client = pymongo.MongoClient(CONNECTION_STRING)
         client.admin.command('ping')
         st.success("✅ Berhasil terhubung!")
