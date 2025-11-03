@@ -16,12 +16,18 @@ import os
 
 # DB Connect
 
-CONNECTION_STRING = os.getenv("MONGO_URI")
-SECRET_KEY = os.getenv("SECRET_KEY")
+# if "MONGO_URI" in st.secrets:
+#     CONNECTION_STRING = st.secrets["MONGO_URI"]
+#     SECRET_KEY = st.secrets["SECRET_KEY"]
+# else:
+#     load_dotenv()
+#     CONNECTION_STRING = os.getenv("MONGO_URI")
+#     SECRET_KEY = os.getenv("SECRET_KEY")
+
 @st.cache_resource
 def init_connection():
     try:
-
+        CONNECTION_STRING = st.secrets["MONGO_URI"]
         client = pymongo.MongoClient(CONNECTION_STRING)
         client.admin.command('ping')
         st.success("✅ Berhasil terhubung!")
@@ -434,7 +440,7 @@ def login_register_page():
 
 # main run
 
-st.set_page_config(page_title="Keamanan Data Lengkap", page_icon="🔐", layout="wide")
+st.set_page_config(page_title="Crypt Web", page_icon="🔐", layout="wide")
 
 if st.session_state['logged_in']:
     main_app()
