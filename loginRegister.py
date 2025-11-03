@@ -6,7 +6,6 @@ import hashlib
 def init_connection():
     try:
         CONNECTION_STRING = "mongodb://localhost:27017/"
-        
         client = pymongo.MongoClient(CONNECTION_STRING)
         client.admin.command('ping')
         st.success("Berhasil terhubung ke MongoDB!", icon="✅")
@@ -24,7 +23,7 @@ if client:
     db = client.get_database("db_streamlit_users")
     users_collection = db.get_collection("users")
 else:
-    st.stop() 
+    st.stop()
 
 def hash_password(password):
     """Meng-hash password menggunakan SHA256."""
@@ -32,73 +31,86 @@ def hash_password(password):
 
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+if 'username' not in st.session_state:
     st.session_state['username'] = ""
+if 'show_register' not in st.session_state:
+    st.session_state['show_register'] = False  # False = Login, True = Register
 
 def main_app():
-    """Tampilan aplikasi utama setelah user berhasil login."""
-    st.sidebar.success(f"Anda masuk sebagai: **{st.session_state['username']}**")
+    """Tampilan aplikasi utama setelah login."""
     st.title("🚀 Halaman Utama Aplikasi Anda")
+    st.success(f"Anda masuk sebagai: **{st.session_state['username']}**")
     st.write("Selamat datang di aplikasi utama!")
     st.write("Anda hanya bisa melihat halaman ini setelah berhasil login.")
     
-    if st.sidebar.button("Keluar"):
+    if st.button("Keluar"):
         st.session_state['logged_in'] = False
         st.session_state['username'] = ""
-        st.rerun() 
+        st.rerun()
 
 def login_register_page():
-    """Tampilan untuk login dan register."""
-    st.title("Selamat Datang!")
-    st.sidebar.image("https://streamlit.io/images/brand/streamlit-logo-primary-col.png", width=200)
-    
-    menu = ["Masuk (Login)", "Daftar (Register)"]
-    choice = st.sidebar.selectbox("Pilih Menu", menu)
+    """Tampilan login dan register tanpa sidebar."""
 
-    if choice == "Daftar (Register)":
-        st.subheader("Buat Akun Baru")
-        
-        with st.form("Form Pendaftaran"):
-            new_user = st.text_input("Username", key="reg_user")
-            new_pass = st.text_input("Password", type="password", key="reg_pass")
-            submit_button = st.form_submit_button(label="Daftar")
+    if st.session_state['show_register']:    
+        st.title("📝 Daftar Akun Baru")
+        with st.form("FormRegister"):
+            new_user = st.text_input("Username")
+            new_pass = st.text_input("Password", type="password")
+            submit_button = st.form_submit_button("Daftar")
 
             if submit_button:
                 if not new_user or not new_pass:
                     st.warning("Username dan Password tidak boleh kosong.")
-                else:                    
-                    if users_collection.find_one({"username": new_user}):
-                        st.error("Username ini sudah terdaftar. Silakan gunakan username lain.")
-                    else:
-                        # Hash password
-                        hashed_pass = hash_password(new_pass)
-                        # Simpan ke database
-                        users_collection.insert_one({"username": new_user, "password": hashed_pass})
-                        st.success("Akun Anda berhasil dibuat!")
-                        st.info("Silakan pindah ke menu 'Masuk (Login)' untuk masuk.")
-
-    elif choice == "Masuk (Login)":
-        st.subheader("Masuk ke Akun Anda")
+                elif users_collection.find_one({"username": new_user}):
+                    st.error("Username sudah terdaftar. Gunakan nama lain.")
+                else:
+                    hashed_pass = hash_password(new_pass)
+                    users_collection.insert_one({"username": new_user, "password": hashed_pass})
+                    st.success("Akun berhasil dibuat! Silakan login.")
+                    st.session_state['show_register'] = False
+                    st.rerun()
         
-        with st.form("Form Login"):
-            username = st.text_input("Username", key="login_user")
-            password = st.text_input("Password", type="password", key="login_pass")
-            login_button = st.form_submit_button(label="Masuk")
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='text-align:center;'>Sudah punya akun?</p>",
+            unsafe_allow_html=True
+        )
+        if st.button("Masuk di sini 🔑"):
+            st.session_state['show_register'] = False
+            st.rerun()
+
+    else:
+        st.title("🔐 Masuk ke Akun Anda")
+        with st.form("FormLogin"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            login_button = st.form_submit_button("Masuk")
 
             if login_button:
                 if not username or not password:
                     st.warning("Username dan Password tidak boleh kosong.")
-                else:                    
-                    hashed_pass_input = hash_password(password)
-                    
-                    user = users_collection.find_one({"username": username, "password": hashed_pass_input})
-                    
+                else:
+                    hashed_input = hash_password(password)
+                    user = users_collection.find_one(
+                        {"username": username, "password": hashed_input}
+                    )
                     if user:
-                        st.success(f"Selamat datang kembali, {username}!")                
                         st.session_state['logged_in'] = True
-                        st.session_state['username'] = username                    
+                        st.session_state['username'] = username
+                        st.success(f"Selamat datang, {username}!")
                         st.rerun()
                     else:
-                        st.error("Username atau Password yang Anda masukkan salah.")
+                        st.error("Username atau Password salah.")
+
+        # Tombol pindah ke register
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='text-align:center;'>Belum punya akun?</p>",
+            unsafe_allow_html=True
+        )
+        if st.button("Daftar di sini 📝"):
+            st.session_state['show_register'] = True
+            st.rerun()
 
 if st.session_state['logged_in']:
     main_app()
