@@ -9,9 +9,7 @@ from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 
-# ===============================
-# === BAGIAN AUTHENTICATION ====
-# ===============================
+# DB Connect
 
 @st.cache_resource
 def init_connection():
@@ -43,9 +41,7 @@ if 'show_register' not in st.session_state:
     st.session_state['show_register'] = False
 
 
-# ===============================
-# === BAGIAN ENKRIPSI AES + RF ==
-# ===============================
+# Rail Fence + AES
 
 PBKDF2_ITERATIONS = 200000
 SALT_SIZE = 16
@@ -142,9 +138,7 @@ def super_decrypt(ciphertext_b64: str, rail_key: int, aes_password: str) -> str:
     return plain
 
 
-# ===============================
-# === BAGIAN LSB + 3DES =========
-# ===============================
+# LSB
 
 def encode_lsb(image, message):
     img = image.convert("RGB")
@@ -194,7 +188,7 @@ def decode_lsb(image):
             break
     return message.replace("###END###", "")
 
-# === 3DES ===
+# 3DES
 MAGIC = b"2DESFILE"
 SALT_SIZE_3DES = 16
 IV_SIZE = 8
@@ -235,9 +229,7 @@ def decrypt_data(file_data: bytes, password: str):
     return plaintext
 
 
-# ===============================
-# === DASHBOARD UTAMA ===========
-# ===============================
+# Main Dashboard
 
 def main_app():
     st.sidebar.title("👤 Pengguna")
@@ -332,9 +324,7 @@ def main_app():
                 st.error(str(e))
 
 
-# ===============================
-# === LOGIN / REGISTER PAGE =====
-# ===============================
+# Login / Register Page
 
 def login_register_page():
     if st.session_state['show_register']:
@@ -378,9 +368,7 @@ def login_register_page():
             st.rerun()
 
 
-# ===============================
-# === MAIN RUN =================
-# ===============================
+# main run
 
 st.set_page_config(page_title="Keamanan Data Lengkap", page_icon="🔐", layout="wide")
 
