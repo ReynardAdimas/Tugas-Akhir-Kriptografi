@@ -1,13 +1,16 @@
 import streamlit as st
 import pymongo
 import hashlib
-import base64
+import base64 
+import io
 from PIL import Image
 from Crypto.Cipher import AES, DES3
 from Crypto.Random import get_random_bytes
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
+from Crypto.Cipher import Blowfish
+from datetime import datetime
 
 # DB Connect
 
@@ -17,21 +20,54 @@ def init_connection():
         CONNECTION_STRING = "mongodb://localhost:27017/"
         client = pymongo.MongoClient(CONNECTION_STRING)
         client.admin.command('ping')
-        st.success("✅ Berhasil terhubung ke MongoDB!")
+        st.success("✅ Berhasil terhubung!")
         return client
     except Exception as e:
-        st.error(f"❌ Gagal konek ke MongoDB: {e}")
+        st.error(f"❌ Gagal Terhubung: {e}")
         return None
 
 client = init_connection()
 if client:
     db = client["db_streamlit_users"]
     users_collection = db["users"]
+    user_data_collection = db["user_data"]
 else:
     st.stop()
 
 def hash_password(password):
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+def blowfish_encrypt(data: str, password: str) -> str:
+    bs = Blowfish.block_size
+    key = hashlib.sha256(password.encode()).digest()[:56]  # Blowfish key max 56 bytes
+    cipher = Blowfish.new(key, Blowfish.MODE_CBC)
+    iv = cipher.iv
+    if isinstance(data, str):
+        data = data.encode()
+    padded_data = pad(data, bs)
+    encrypted = cipher.encrypt(padded_data)
+    return base64.b64encode(iv + encrypted).decode('utf-8')
+
+def blowfish_decrypt(b64_data: str, password: str) -> str:
+    raw = base64.b64decode(b64_data)
+    bs = Blowfish.block_size
+    key = hashlib.sha256(password.encode()).digest()[:56]
+    iv = raw[:bs]
+    cipher = Blowfish.new(key, Blowfish.MODE_CBC, iv)
+    decrypted = unpad(cipher.decrypt(raw[bs:]), bs)
+    return decrypted.decode('utf-8')
+
+def save_encrypted_data(username, data_type, original_name, encrypted_data):
+    blowfish_password = "my_secret_key"
+    double_encrypted = blowfish_encrypt(encrypted_data, blowfish_password)
+    entry = {
+        "username":username, 
+        "type" : data_type,
+        "original_name": original_name, 
+        "encrypted_data" : double_encrypted,
+        "timestamp" : datetime.now()
+    }
+    user_data_collection.insert_one(entry)
 
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
@@ -261,9 +297,21 @@ def main_app():
                     encoded_img = encode_lsb(image, message + "###END###")
                     if encoded_img:
                         st.image(encoded_img, caption="Gambar Hasil Encode", use_container_width=True)
-                        encoded_img.save("encoded_image.png")
-                        with open("encoded_image.png", "rb") as file:
-                            st.download_button("💾 Download Gambar Encode", data=file, file_name="encoded_image.png")
+                        buffer = io.BytesIO()
+                        encoded_img.save(buffer, format="PNG")
+                        buffer.seek(0)
+                        encoded_b64 = base64.b64encode(buffer.read()).decode("utf-8")
+                        save_encrypted_data(
+                            st.session_state["username"],
+                            "lsb",
+                            image_file.name,
+                            encoded_b64
+                        )
+                        st.success("✅ Gambar terenkripsi disimpan ke database!")
+                        st.download_button("💾 Download Gambar Encode", data=base64.b64decode(encoded_b64), file_name="encoded_image.png")
+                        # encoded_img.save("encoded_image.png")
+                        # with open("encoded_image.png", "rb") as file:
+                        #     st.download_button("💾 Download Gambar Encode", data=file, file_name="encoded_image.png")
 
         with col2:
             st.subheader("🔓 Decode Pesan dari Gambar")
@@ -287,7 +335,13 @@ def main_app():
                     if mode == "Encrypt":
                         result = encrypt_data(file_bytes, password)
                         file_name = uploaded_file.name + ".enc"
-                        st.success("✅ File berhasil dienkripsi!")
+                        save_encrypted_data(
+                            st.session_state["username"], 
+                            "3des",
+                            uploaded_file.name,
+                            base64.b64encode(result).decode("utf-8")
+                        )
+                        st.success("✅ File berhasil dienkripsi dan disimpan pada database!")
                     else:
                         result = decrypt_data(file_bytes, password)
                         file_name = uploaded_file.name.replace(".enc", "_decrypted")
@@ -305,6 +359,12 @@ def main_app():
         if st.button("🔐 Enkripsi Sekarang"):
             try:
                 result = super_encrypt(plaintext, int(rail_key_enc), aes_password_enc)
+                save_encrypted_data(
+                    st.session_state["username"],
+                    "super_encrypt",
+                    "text_message",
+                    result
+                )
                 st.success("✅ Berhasil mengenkripsi!")
                 st.code(result)
                 st.download_button('Download Ciphertext', result, file_name='ciphertext.txt')
