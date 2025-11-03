@@ -136,56 +136,56 @@ def super_decrypt(ciphertext_b64: str, rail_key: int, aes_password: str) -> str:
     return plain
 
 def main_app():
-    st.title("🚀 Halaman Utama Aplikasi Anda")
-    st.success(f"Anda masuk sebagai: **{st.session_state['username']}**")
-    st.write("Selamat datang di aplikasi utama!")
-    st.write("Anda hanya bisa melihat halaman ini setelah berhasil login.")
-    tab1, tab2, tab3 = st.tabs(["Aplikasi", "Super Enkripsi", "Profile"])
-    with tab1:
-        st.write("Ini adalah ruang aplikasi utama.")
-    with tab2:
-        st.subheader("Enkripsi")
-        plaintext = st.text_area("Plaintext", height=160)
-        rail_key_enc = st.number_input("Rail Fence key (enkripsi)", min_value=2, max_value=50, value=3, step=1, key="rk_enc")
-        aes_password_enc = st.text_input("AES password (enkripsi)", type="password", key="ap_enc")
-        if st.button("Encrypt (Rail Fence -> AES)"):
-            if plaintext.strip() == "":
-                st.warning("Teks kosong — masukkan plaintext yang ingin dienkripsi.")
-            elif aes_password_enc.strip() == "":
-                st.warning("Masukkan password AES.")
-            else:
-                try:
-                    result = super_encrypt(plaintext, int(rail_key_enc), aes_password_enc)
-                    st.success("Berhasil mengenkripsi!")
-                    st.code(result, language='text')
-                    st.download_button('Download ciphertext (.txt)', result, file_name='ciphertext.txt')
-                except Exception as e:
-                    st.error(f'Gagal mengenkripsi: {e}')
-        st.markdown("---")
-        st.subheader("Dekripsi")
-        ciphertext_b64 = st.text_area("Ciphertext (base64 dari hasil encrypt)", height=160, key="ct_b64")
-        rail_key_dec = st.number_input("Rail Fence key (dekripsi)", min_value=2, max_value=50, value=3, step=1, key="rk_dec")
-        aes_password_dec = st.text_input("AES password (dekripsi)", type="password", key="ap_dec")
-        if st.button("Decrypt (AES -> Rail Fence)"):
-            if ciphertext_b64.strip() == "":
-                st.warning("Masukkan ciphertext (base64) untuk didekripsi.")
-            elif aes_password_dec.strip() == "":
-                st.warning("Masukkan password AES.")
-            else:
-                try:
-                    plaintext = super_decrypt(ciphertext_b64.strip(), int(rail_key_dec), aes_password_dec)
-                    st.success("Berhasil didekripsi!")
-                    st.text_area("Plaintext hasil dekripsi", value=plaintext, height=200)
-                except ValueError as ve:
-                    st.error(str(ve))
-                except Exception:
-                    st.error('Gagal mendekripsi. Pastikan password, rail key, dan ciphertext benar.')
-    with tab3:
-        st.write(f"Username: {st.session_state['username']}")
-        if st.button("Keluar"):
-            st.session_state['logged_in'] = False
-            st.session_state['username'] = ""
-            st.rerun()
+    st.sidebar.title("👤 Pengguna")
+    st.sidebar.write(f"Username: **{st.session_state['username']}**")
+    if st.sidebar.button("Keluar 🚪"):
+        st.session_state['logged_in'] = False
+        st.session_state['username'] = ""
+        st.rerun()
+
+    st.title("🔒 Super Enkripsi & Dekripsi (Rail Fence + AES)")
+    st.markdown("---")
+
+    st.subheader("🧩 Enkripsi")
+    plaintext = st.text_area("Masukkan teks yang ingin dienkripsi", height=160)
+    rail_key_enc = st.number_input("Kunci Rail Fence (angka)", min_value=2, max_value=50, value=3, step=1)
+    aes_password_enc = st.text_input("Password AES", type="password")
+
+    if st.button("🔐 Enkripsi Sekarang"):
+        if plaintext.strip() == "":
+            st.warning("Masukkan teks yang ingin dienkripsi.")
+        elif aes_password_enc.strip() == "":
+            st.warning("Masukkan password AES.")
+        else:
+            try:
+                result = super_encrypt(plaintext, int(rail_key_enc), aes_password_enc)
+                st.success("✅ Berhasil mengenkripsi!")
+                st.code(result, language='text')
+                st.download_button('Download Ciphertext', result, file_name='ciphertext.txt')
+            except Exception as e:
+                st.error(f"Gagal mengenkripsi: {e}")
+
+    st.markdown("---")
+
+    st.subheader("🔓 Dekripsi")
+    ciphertext_b64 = st.text_area("Masukkan ciphertext (base64)", height=160)
+    rail_key_dec = st.number_input("Kunci Rail Fence untuk Dekripsi", min_value=2, max_value=50, value=3, step=1)
+    aes_password_dec = st.text_input("Password AES untuk Dekripsi", type="password")
+
+    if st.button("🔍 Dekripsi Sekarang"):
+        if ciphertext_b64.strip() == "":
+            st.warning("Masukkan ciphertext base64 terlebih dahulu.")
+        elif aes_password_dec.strip() == "":
+            st.warning("Masukkan password AES.")
+        else:
+            try:
+                plaintext = super_decrypt(ciphertext_b64.strip(), int(rail_key_dec), aes_password_dec)
+                st.success("✅ Berhasil mendekripsi!")
+                st.text_area("Hasil Dekripsi:", value=plaintext, height=200)
+            except ValueError as ve:
+                st.error(str(ve))
+            except Exception:
+                st.error("Gagal mendekripsi. Pastikan password, kunci, dan ciphertext benar.")
 
 def login_register_page():
     if st.session_state['show_register']:
@@ -206,8 +206,7 @@ def login_register_page():
                     st.session_state['show_register'] = False
                     st.rerun()
         st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;'>Sudah punya akun?</p>", unsafe_allow_html=True)
-        if st.button("Masuk di sini 🔑"):
+        if st.button("🔑 Sudah punya akun? Masuk di sini"):
             st.session_state['show_register'] = False
             st.rerun()
     else:
@@ -230,8 +229,7 @@ def login_register_page():
                     else:
                         st.error("Username atau Password salah.")
         st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;'>Belum punya akun?</p>", unsafe_allow_html=True)
-        if st.button("Daftar di sini 📝"):
+        if st.button("📝 Belum punya akun? Daftar di sini"):
             st.session_state['show_register'] = True
             st.rerun()
 
