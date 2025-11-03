@@ -1,1 +1,0 @@
-print("Babi koe dim")

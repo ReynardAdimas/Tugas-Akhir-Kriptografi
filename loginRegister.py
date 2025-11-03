@@ -5,7 +5,7 @@ import hashlib
 @st.cache_resource
 def init_connection():
     try:
-        CONNECTION_STRING = "mongodb+srv://<username>:<password>@<cluster-url>/<db_name>?retryWrites=true&w=majority"
+        CONNECTION_STRING = "mongodb://localhost:27017/"
         
         client = pymongo.MongoClient(CONNECTION_STRING)
         client.admin.command('ping')
