@@ -13,6 +13,7 @@ from Crypto.Cipher import Blowfish
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+import hmac
 
 # DB Connect
 
@@ -28,9 +29,10 @@ import os
 def init_connection():
     try:
         CONNECTION_STRING = st.secrets["MONGO_URI"]
+        # CONNECTION_STRING = "mongodb://localhost:27017"
         client = pymongo.MongoClient(CONNECTION_STRING)
         client.admin.command('ping')
-        st.success("✅ Berhasil terhubung!")
+        st.badge("✅ Berhasil terhubung!")
         return client
     except Exception as e:
         st.error(f"❌ Gagal Terhubung: {e}")
@@ -45,7 +47,47 @@ else:
     st.stop()
 
 def hash_password(password):
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+    return hashlib.sha256(password.encode('utf-8')).hexdigest() 
+
+# blake2b section 
+def generate_salt(n=16):
+    return os.urandom(n) 
+
+def hash_pass_blake2b(password: str, salt: bytes | None = None, digest_size: int = 32) -> str:
+    if salt is None:
+        salt = generate_salt()
+    h = hashlib.blake2b(digest_size=digest_size)
+    h.update(salt)
+    h.update(password.encode('utf-8'))
+    return salt.hex() + "$" + h.hexdigest() 
+
+def verify_blake2b(password: str, stored: str) -> bool:
+    try:
+        salt_hex, digest_hex = stored.split("$", 1)
+    except ValueError:
+        return False 
+    salt = bytes.fromhex(salt_hex)
+    h = hashlib.blake2b(digest_size=len(bytes.fromhex(digest_hex)))
+    h.update(salt)
+    h.update(password.encode('utf-8'))
+    return hmac.compare_digest(h.hexdigest(), digest_hex) 
+
+def verify_and_upgrade_password(username: str, password: str, users_collection) -> bool:
+    user = users_collection.find_one({"username" : username})
+    if not user or "password" not in user:
+        return False 
+    stored = user["password"] 
+    if "$" in stored:
+        if verify_blake2b(password, stored):
+            return True 
+        return False 
+    
+    sha256_hex = hashlib.sha256(password.encode('utf-8')).hexdigest() 
+    if hmac.compare_digest(sha256_hex, stored):
+        new_stored = hash_pass_blake2b(password)
+        users_collection.update_one({"_id":user["_id"]}, {"$set" : {"password" : new_stored}})
+        return True 
+    return False
 
 def blowfish_encrypt(data: str, password: str) -> str:
     bs = Blowfish.block_size
@@ -285,7 +327,7 @@ def main_app():
         st.session_state['username'] = ""
         st.rerun()
 
-    st.title("🔐 Aplikasi Keamanan Data Lengkap")
+    # st.title("🔐 Aplikasi Keamanan Data Lengkap")
     pilihan = st.sidebar.radio("Pilih fitur:", [
         "🧩 LSB Steganografi",
         "🔐 Enkripsi File (3DES)",
@@ -409,7 +451,7 @@ def login_register_page():
             else:
                 users_collection.insert_one({
                     "username": new_user,
-                    "password": hash_password(new_pass)
+                    "password": hash_pass_blake2b(new_pass)
                 })
                 st.success("Akun berhasil dibuat!")
                 st.session_state['show_register'] = False
@@ -422,17 +464,13 @@ def login_register_page():
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         if st.button("Masuk"):
-            user = users_collection.find_one({
-                "username": username,
-                "password": hash_password(password)
-            })
-            if user:
-                st.session_state['logged_in'] = True
+            if verify_and_upgrade_password(username, password, users_collection):
+                st.session_state['logged_in'] = True 
                 st.session_state['username'] = username
-                st.success(f"Selamat datang, {username}!")
+                st.success(f"Selamat datang, {username}")
                 st.rerun()
-            else:
-                st.error("Username atau password salah.")
+            else: 
+                st.error("Username atau password salah")
         if st.button("📝 Belum punya akun? Daftar"):
             st.session_state['show_register'] = True
             st.rerun()
@@ -440,7 +478,7 @@ def login_register_page():
 
 # main run
 
-st.set_page_config(page_title="Crypt Web", page_icon="🔐", layout="wide")
+st.set_page_config(page_title="Crypt Web", page_icon="🔐")
 
 if st.session_state['logged_in']:
     main_app()
